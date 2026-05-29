@@ -1,7 +1,14 @@
 // Browser-side Supabase client — usa ANON KEY (segura para o frontend)
 import { createClient } from "@supabase/supabase-js";
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+export function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+}
 
-export const supabase = createClient(url, key);
+// Alias para compatibilidade com imports existentes
+export const supabase = typeof window !== "undefined"
+  ? getSupabase()
+  : null as never;
