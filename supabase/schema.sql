@@ -99,9 +99,11 @@ alter table leads          enable row level security;
 
 -- API routes usam service_role key (bypassa RLS automaticamente)
 -- Dashboard usa anon key com políticas permissivas (ferramenta interna)
+drop policy if exists "anon_read_sellers" on sellers;
 create policy "anon_read_sellers" on sellers
   for select using (true);
 
+drop policy if exists "anon_read_leads" on leads;
 create policy "anon_read_leads" on leads
   for select using (true);
 
