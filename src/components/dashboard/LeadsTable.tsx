@@ -1,36 +1,26 @@
 "use client";
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { Lead } from "@/types";
 import { formatDate, formatPhone, sourceLabel } from "@/lib/utils";
-import { Badge } from "@/components/ui/Badge";
-import { Search, ChevronDown, ChevronUp } from "lucide-react";
+import { StatusBadge } from "./StatusBadge";
+import { ResponseTimer } from "./ResponseTimer";
+import { Search, ChevronDown, ChevronUp, Download, Filter } from "lucide-react";
+import { STATUS_ORDER, getStatus } from "@/lib/status";
 
 interface LeadsTableProps {
   leads: Lead[];
+  onLeadClick?: (id: string) => void;
 }
 
-function sourceBadge(source: string) {
-  const map: Record<string, "blue" | "green" | "yellow"> = {
-    form:    "blue",
-    cta_btn: "yellow",
-    float:   "green",
-  };
-  return map[source] ?? "gray" as never;
-}
-
-function deviceIcon(device: string | null) {
-  if (device === "mobile")  return "📱";
-  if (device === "tablet")  return "📋";
-  return "🖥️";
-}
-
-export function LeadsTable({ leads }: LeadsTableProps) {
+export function LeadsTable({ leads, onLeadClick }: LeadsTableProps) {
   const [search, setSearch]         = useState("");
   const [sortField, setSortField]   = useState<keyof Lead>("created_at");
   const [sortDir, setSortDir]       = useState<"asc" | "desc">("desc");
   const [filterSeller, setFilterSeller] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
 
-  const sellers = [...new Set(leads.map((l) => l.seller_name).filter(Boolean))];
+  const sellers  = [...new Set(leads.map((l) => l.seller_name).filter(Boolean))];
 
   const filtered = leads
     .filter((l) => {
@@ -41,8 +31,9 @@ export function LeadsTable({ leads }: LeadsTableProps) {
         l.city?.toLowerCase().includes(q) ||
         l.seller_name?.toLowerCase().includes(q) ||
         l.utm_campaign?.toLowerCase().includes(q);
-      const matchSeller = !filterSeller || l.seller_name === filterSeller;
-      return matchSearch && matchSeller;
+      return matchSearch
+        && (!filterSeller || l.seller_name === filterSeller)
+        && (!filterStatus || l.status === filterStatus);
     })
     .sort((a, b) => {
       const va = String(a[sortField] ?? "");
@@ -62,6 +53,20 @@ export function LeadsTable({ leads }: LeadsTableProps) {
       : <ChevronDown className="w-3 h-3 text-blue-400" />;
   }
 
+  function exportCSV() {
+    const headers = ["Data", "Cliente", "Telefone", "Cidade", "Estado", "Vendedor", "Status", "Origem", "Kit", "Campanha", "UTM Source", "Device"];
+    const rows    = filtered.map((l) => [
+      l.created_at, l.customer_name, l.customer_phone, l.city ?? "", l.state ?? "",
+      l.seller_name ?? "", l.status, l.source, l.kit ?? "", l.utm_campaign ?? "", l.utm_source ?? "", l.device ?? "",
+    ]);
+    const csv  = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href = url; a.download = `leads-${new Date().toISOString().slice(0, 10)}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="space-y-4">
       {/* Filters */}
@@ -69,79 +74,80 @@ export function LeadsTable({ leads }: LeadsTableProps) {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
           <input
-            type="text"
+            type="text" value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Buscar por nome, telefone, cidade, campanha..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 bg-[#1a1d27] border border-white/[0.08] rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500/50"
+            className="w-full pl-9 pr-4 py-2.5 bg-[#111118] border border-white/[0.08] rounded-xl text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500/50 transition-all"
           />
         </div>
-        <select
-          value={filterSeller}
-          onChange={e => setFilterSeller(e.target.value)}
-          className="px-3 py-2.5 bg-[#1a1d27] border border-white/[0.08] rounded-lg text-sm text-slate-200 focus:outline-none focus:border-blue-500/50 min-w-[160px]"
-        >
-          <option value="">Todos os vendedores</option>
-          {sellers.map(s => <option key={s} value={s!}>{s}</option>)}
-        </select>
+        <div className="flex gap-2">
+          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+            className="px-3 py-2.5 bg-[#111118] border border-white/[0.08] rounded-xl text-sm text-slate-200 focus:outline-none focus:border-blue-500/50 min-w-[160px]">
+            <option value="">Todos os status</option>
+            {STATUS_ORDER.map(s => <option key={s} value={s}>{getStatus(s).label}</option>)}
+          </select>
+          <select value={filterSeller} onChange={e => setFilterSeller(e.target.value)}
+            className="px-3 py-2.5 bg-[#111118] border border-white/[0.08] rounded-xl text-sm text-slate-200 focus:outline-none focus:border-blue-500/50 min-w-[160px]">
+            <option value="">Todos os vendedores</option>
+            {sellers.map(s => <option key={s} value={s!}>{s}</option>)}
+          </select>
+          <button onClick={exportCSV}
+            className="flex items-center gap-2 px-3 py-2.5 bg-white/[0.05] hover:bg-white/[0.08] border border-white/[0.08] rounded-xl text-sm text-slate-300 transition-all">
+            <Download className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Table */}
-      <div className="bg-[#1a1d27] rounded-xl border border-white/[0.06] overflow-hidden">
+      <div className="bg-[#111118] rounded-xl border border-white/[0.06] overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-white/[0.06]">
                 {[
-                  { label: "Data",      field: "created_at"    as keyof Lead },
-                  { label: "Cliente",   field: "customer_name" as keyof Lead },
-                  { label: "Telefone",  field: "customer_phone" as keyof Lead },
-                  { label: "Cidade",    field: "city"          as keyof Lead },
-                  { label: "Vendedor",  field: "seller_name"   as keyof Lead },
-                  { label: "Origem",    field: "source"        as keyof Lead },
-                  { label: "Campanha",  field: "utm_campaign"  as keyof Lead },
-                  { label: "Device",    field: "device"        as keyof Lead },
+                  { label: "Data",     field: "created_at"     as keyof Lead },
+                  { label: "Cliente",  field: "customer_name"  as keyof Lead },
+                  { label: "Telefone", field: "customer_phone" as keyof Lead },
+                  { label: "Status",   field: "status"         as keyof Lead },
+                  { label: "Tempo",    field: "last_interaction_at" as keyof Lead },
+                  { label: "Vendedor", field: "seller_name"    as keyof Lead },
+                  { label: "Origem",   field: "source"         as keyof Lead },
+                  { label: "Cidade",   field: "city"           as keyof Lead },
                 ].map(({ label, field }) => (
-                  <th
-                    key={field}
-                    onClick={() => toggleSort(field)}
-                    className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider cursor-pointer hover:text-slate-300 transition-colors select-none"
-                  >
-                    <span className="flex items-center gap-1">
-                      {label}
-                      <SortIcon field={field} />
-                    </span>
+                  <th key={field} onClick={() => toggleSort(field)}
+                    className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider cursor-pointer hover:text-slate-300 transition-colors select-none">
+                    <span className="flex items-center gap-1">{label}<SortIcon field={field} /></span>
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
               {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-slate-500">
-                    {search || filterSeller ? "Nenhum lead encontrado com esses filtros" : "Nenhum lead ainda"}
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((lead) => (
-                  <tr key={lead.id} className="hover:bg-white/[0.02] transition-colors">
-                    <td className="px-4 py-3 text-slate-400 whitespace-nowrap text-xs">{formatDate(lead.created_at)}</td>
-                    <td className="px-4 py-3 text-slate-200 font-medium">{lead.customer_name}</td>
-                    <td className="px-4 py-3 text-slate-400">{formatPhone(lead.customer_phone)}</td>
-                    <td className="px-4 py-3 text-slate-400">{[lead.city, lead.state].filter(Boolean).join(" - ") || "—"}</td>
-                    <td className="px-4 py-3 text-slate-200">{lead.seller_name ?? "—"}</td>
-                    <td className="px-4 py-3">
-                      <Badge label={sourceLabel(lead.source)} variant={sourceBadge(lead.source)} />
-                    </td>
-                    <td className="px-4 py-3 text-slate-400 text-xs">{lead.utm_campaign ?? "—"}</td>
-                    <td className="px-4 py-3 text-slate-400 text-center">{deviceIcon(lead.device)}</td>
-                  </tr>
-                ))
-              )}
+                <tr><td colSpan={8} className="px-4 py-12 text-center text-slate-500">
+                  {search || filterSeller || filterStatus ? "Nenhum lead encontrado com esses filtros" : "Nenhum lead ainda"}
+                </td></tr>
+              ) : filtered.map((lead, i) => (
+                <motion.tr
+                  key={lead.id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: Math.min(i * 0.02, 0.3) }}
+                  onClick={() => onLeadClick?.(lead.id)}
+                  className="hover:bg-white/[0.025] transition-colors cursor-pointer"
+                >
+                  <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">{formatDate(lead.created_at)}</td>
+                  <td className="px-4 py-3 text-slate-200 font-medium">{lead.customer_name}</td>
+                  <td className="px-4 py-3 text-slate-400">{formatPhone(lead.customer_phone)}</td>
+                  <td className="px-4 py-3"><StatusBadge status={lead.status} /></td>
+                  <td className="px-4 py-3"><ResponseTimer lastInteraction={lead.last_interaction_at} status={lead.status} /></td>
+                  <td className="px-4 py-3 text-slate-300">{lead.seller_name ?? "—"}</td>
+                  <td className="px-4 py-3 text-slate-400 text-xs">{sourceLabel(lead.source)}</td>
+                  <td className="px-4 py-3 text-slate-400 text-xs">{[lead.city, lead.state].filter(Boolean).join(" — ") || "—"}</td>
+                </motion.tr>
+              ))}
             </tbody>
           </table>
         </div>
-        <div className="px-4 py-2.5 border-t border-white/[0.06] text-xs text-slate-500">
+        <div className="px-4 py-2.5 border-t border-white/[0.06] text-xs text-slate-600">
           {filtered.length} de {leads.length} leads
         </div>
       </div>

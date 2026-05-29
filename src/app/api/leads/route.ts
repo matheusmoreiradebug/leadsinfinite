@@ -94,6 +94,16 @@ export async function POST(req: NextRequest): Promise<NextResponse<ApiLeadRespon
 
     if (insertErr) console.error("Lead insert error:", insertErr);
 
+    // ── Registrar evento 'created' na timeline ────────────────────
+    if (lead?.id) {
+      await supabase.from("lead_events").insert({
+        lead_id: lead.id,
+        type:    "created",
+        content: `Lead criado via ${body.source === "form" ? "formulário" : body.source === "cta_btn" ? `botão (${body.kit ?? "geral"})` : "WhatsApp flutuante"}`,
+        new_status: "new",
+      });
+    }
+
     // ── Incrementar contador do vendedor ──────────────────────────
 
     // Incrementa contador via select + update (simples e sem função extra)

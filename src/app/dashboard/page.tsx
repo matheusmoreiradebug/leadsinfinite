@@ -1,24 +1,30 @@
 "use client";
 export const dynamic = "force-dynamic";
 import { useEffect, useState } from "react";
-import { Users, MessageSquare, TrendingUp, Calendar, RefreshCw } from "lucide-react";
+import { motion } from "framer-motion";
+import { Users, MessageSquare, TrendingUp, Calendar, RefreshCw, CheckCircle, AlertTriangle, Percent } from "lucide-react";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { LeadsChart } from "@/components/dashboard/LeadsChart";
 import { SellerPieChart } from "@/components/dashboard/SellerPieChart";
 import { CampaignTable } from "@/components/dashboard/CampaignTable";
+import { AlertBanner } from "@/components/dashboard/AlertBanner";
+import { StatusBadge } from "@/components/dashboard/StatusBadge";
 import { DashboardStats } from "@/types";
+import { getStatus, STATUS_ORDER } from "@/lib/status";
+
+const container = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
 
 export default function DashboardPage() {
-  const [stats, setStats]     = useState<DashboardStats | null>(null);
+  const [stats, setStats]   = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [lastRefresh, setLastRefresh] = useState(new Date());
+  const [ts, setTs]         = useState(new Date());
 
   async function load() {
     setLoading(true);
     const res = await fetch("/api/stats");
     if (res.ok) setStats(await res.json());
     setLoading(false);
-    setLastRefresh(new Date());
+    setTs(new Date());
   }
 
   useEffect(() => { load(); }, []);
@@ -27,109 +33,111 @@ export default function DashboardPage() {
     <div className="space-y-6 max-w-7xl">
       {/* Header */}
       <div className="flex items-start justify-between">
-        <div>
+        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
           <h1 className="text-2xl font-bold text-white tracking-tight">Visão Geral</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Última atualização: {lastRefresh.toLocaleTimeString("pt-BR")}
+          <p className="text-sm text-slate-600 mt-0.5">
+            Atualizado às {ts.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
           </p>
-        </div>
-        <button
-          onClick={load}
-          disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.08] rounded-lg text-sm text-slate-300 transition-all disabled:opacity-50"
+        </motion.div>
+        <motion.button
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+          onClick={load} disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 bg-white/[0.05] hover:bg-white/[0.08] border border-white/[0.08] rounded-xl text-sm text-slate-400 transition-all disabled:opacity-40"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           Atualizar
-        </button>
+        </motion.button>
       </div>
 
-      {/* KPI cards */}
+      {/* Alert banner */}
+      {stats && <AlertBanner count={stats.no_response_leads} />}
+
+      {/* KPI Cards */}
       {loading && !stats ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-28 bg-[#1a1d27] rounded-xl border border-white/[0.06] animate-pulse" />
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="h-28 bg-[#111118] rounded-xl border border-white/[0.06] animate-pulse" />
           ))}
         </div>
-      ) : stats ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatsCard
-            title="Total de Leads"
-            value={stats.total_leads}
-            icon={MessageSquare}
-            accent="blue"
-            subtitle="Desde o início"
-          />
-          <StatsCard
-            title="Leads Hoje"
-            value={stats.leads_today}
-            icon={Calendar}
-            accent="green"
-            subtitle="Nas últimas 24h"
-          />
-          <StatsCard
-            title="Leads Esta Semana"
-            value={stats.leads_week}
-            icon={TrendingUp}
-            accent="purple"
-            subtitle="Últimos 7 dias"
-          />
-          <StatsCard
-            title="Vendedores Ativos"
-            value={stats.active_sellers}
-            icon={Users}
-            accent="amber"
-            subtitle="No rodízio agora"
-          />
-        </div>
-      ) : null}
+      ) : stats && (
+        <motion.div variants={container} initial="hidden" animate="show"
+          className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          <StatsCard title="Total de Leads"    value={stats.total_leads}       icon={MessageSquare} accent="blue"   delay={0}    />
+          <StatsCard title="Leads Hoje"        value={stats.leads_today}       icon={Calendar}      accent="green"  delay={0.06} />
+          <StatsCard title="Em Aberto"         value={stats.open_leads}        icon={TrendingUp}    accent="purple" delay={0.12} />
+          <StatsCard title="Sem Resposta"      value={stats.no_response_leads} icon={AlertTriangle} accent="red"    delay={0.18} />
+          <StatsCard title="Fechados"          value={stats.closed_leads}      icon={CheckCircle}   accent="cyan"   delay={0.24} />
+          <StatsCard title="Vendedores Ativos" value={stats.active_sellers}    icon={Users}         accent="amber"  delay={0.30} />
+        </motion.div>
+      )}
 
-      {/* Charts row */}
+      {/* Charts */}
       {stats && (
         <>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2">
-              <LeadsChart data={stats.leads_by_day} />
-            </div>
-            <div>
-              <SellerPieChart data={stats.leads_by_seller} />
-            </div>
-          </div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
+            className="grid grid-cols-1 lg:grid-cols-3 gap-4"
+          >
+            <div className="lg:col-span-2"><LeadsChart data={stats.leads_by_day} /></div>
+            <SellerPieChart data={stats.leads_by_seller} />
+          </motion.div>
 
-          {/* Campaign / Source */}
-          <CampaignTable
-            campaigns={stats.leads_by_campaign}
-            sources={stats.leads_by_source}
-          />
+          {/* Status distribution */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
+            className="bg-[#111118] rounded-xl border border-white/[0.06] p-5"
+          >
+            <h3 className="text-sm font-semibold text-white mb-4">Distribuição por Status</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+              {STATUS_ORDER.map(s => {
+                const stat   = stats.leads_by_status.find(x => x.status === s);
+                const count  = stat?.count ?? 0;
+                const cfg    = getStatus(s);
+                return (
+                  <div key={s} className="text-center p-3 rounded-xl border" style={{ background: cfg.bg, borderColor: cfg.border }}>
+                    <div className="text-xl font-bold" style={{ color: cfg.color }}>{count}</div>
+                    <div className="text-xs text-slate-400 mt-1 leading-tight">{cfg.label}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}>
+            <CampaignTable campaigns={stats.leads_by_campaign} sources={stats.leads_by_source} />
+          </motion.div>
 
           {/* Seller ranking */}
-          <div className="bg-[#1a1d27] rounded-xl border border-white/[0.06] p-5">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}
+            className="bg-[#111118] rounded-xl border border-white/[0.06] p-5"
+          >
             <h3 className="text-sm font-semibold text-white mb-4">Ranking de Vendedores</h3>
             <div className="space-y-3">
-              {stats.leads_by_seller
-                .sort((a, b) => b.count - a.count)
-                .map((s, i) => {
-                  const max = stats.leads_by_seller[0]?.count ?? 1;
-                  return (
-                    <div key={s.seller_id} className="flex items-center gap-4">
-                      <span className="text-xs font-bold text-slate-600 w-5 text-right">{i + 1}</span>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm text-slate-200">{s.seller_name}</span>
-                          <span className="text-sm font-semibold text-white">{s.count} leads</span>
-                        </div>
-                        <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-blue-500 rounded-full"
-                            style={{ width: `${Math.round((s.count / max) * 100)}%` }}
-                          />
-                        </div>
+              {stats.leads_by_seller.sort((a, b) => b.count - a.count).map((s, i) => {
+                const max = stats.leads_by_seller[0]?.count ?? 1;
+                return (
+                  <div key={s.seller_id} className="flex items-center gap-4">
+                    <span className="text-xs font-bold text-slate-700 w-4">{i + 1}</span>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm text-slate-200">{s.seller_name}</span>
+                        <span className="text-sm font-semibold text-white">{s.count} leads</span>
                       </div>
-                      <span className="text-xs text-slate-500 w-10 text-right">{s.percentage}%</span>
+                      <div className="h-1.5 bg-white/[0.05] rounded-full overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }} animate={{ width: `${Math.round((s.count / max) * 100)}%` }}
+                          transition={{ duration: 0.8, delay: 0.6 + i * 0.05 }}
+                          className="h-full rounded-full" style={{ background: "linear-gradient(90deg, #2563eb, #3b82f6)" }}
+                        />
+                      </div>
                     </div>
-                  );
-                })}
+                    <span className="text-xs text-slate-600 w-10 text-right">{s.percentage}%</span>
+                  </div>
+                );
+              })}
             </div>
-          </div>
+          </motion.div>
         </>
       )}
     </div>
