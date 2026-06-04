@@ -1,15 +1,26 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase-server";
 import { DashboardStats } from "@/types";
-import { format, subDays, startOfDay } from "date-fns";
+import { format, subDays, startOfDay, endOfDay, differenceInDays } from "date-fns";
 import { OPEN_STATUSES } from "@/lib/status";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const supabase = createServerClient();
+  const { searchParams } = req.nextUrl;
+
+  // Período customizável via query params (padrão: últimos 30 dias)
+  const fromParam = searchParams.get("from");
+  const toParam   = searchParams.get("to");
+  const rangeFrom = fromParam ? new Date(fromParam) : startOfDay(subDays(new Date(), 29));
+  const rangeTo   = toParam   ? endOfDay(new Date(toParam))   : endOfDay(new Date());
+  const rangeFromISO = rangeFrom.toISOString();
+  const rangeToISO   = rangeTo.toISOString();
+
+  // Quantos dias abrange o período selecionado (para o gráfico)
+  const rangeDays = Math.max(1, differenceInDays(rangeTo, rangeFrom) + 1);
 
   const today      = format(startOfDay(new Date()), "yyyy-MM-dd");
   const weekStart  = format(startOfDay(subDays(new Date(), 6)), "yyyy-MM-dd");
-  const monthStart = format(startOfDay(subDays(new Date(), 29)), "yyyy-MM-dd");
   const ago2h      = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
   const ago30m     = new Date(Date.now() - 30 * 60 * 1000).toISOString();
 
@@ -30,9 +41,11 @@ export async function GET() {
     supabase.from("leads").select("*", { count: "exact", head: true }).gte("created_at", today),
     supabase.from("leads").select("*", { count: "exact", head: true }).gte("created_at", weekStart),
     supabase.from("sellers").select("id, name, leads_count, active"),
+    // Leads do período selecionado (para gráficos e distribuições)
     supabase.from("leads")
       .select("created_at, seller_id, seller_name, source, utm_source, utm_campaign, state, status")
-      .gte("created_at", monthStart)
+      .gte("created_at", rangeFromISO)
+      .lte("created_at", rangeToISO)
       .order("created_at", { ascending: true }),
     supabase.from("leads").select("*", { count: "exact", head: true })
       .in("status", OPEN_STATUSES as unknown as string[]),
@@ -67,9 +80,12 @@ export async function GET() {
     percentage: totalLS ? Math.round((v.count / totalLS) * 100) : 0,
   }));
 
-  // Leads por dia (últimos 30)
+  // Leads por dia (período selecionado)
   const dayMap = new Map<string, number>();
-  for (let i = 29; i >= 0; i--) dayMap.set(format(subDays(new Date(), i), "yyyy-MM-dd"), 0);
+  for (let i = rangeDays - 1; i >= 0; i--) {
+    const d = new Date(rangeTo); d.setDate(d.getDate() - i);
+    dayMap.set(format(d, "yyyy-MM-dd"), 0);
+  }
   for (const lead of leads30 ?? []) {
     const day = lead.created_at.slice(0, 10);
     dayMap.set(day, (dayMap.get(day) ?? 0) + 1);

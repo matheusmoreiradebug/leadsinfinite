@@ -7,6 +7,7 @@ import { formatDayLabel } from "@/lib/utils";
 
 interface LeadsChartProps {
   data: DayStat[];
+  label?: string;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -20,12 +21,19 @@ function CustomTooltip({ active, payload, label }: any) {
   );
 }
 
-export function LeadsChart({ data }: LeadsChartProps) {
+export function LeadsChart({ data, label }: LeadsChartProps) {
+  const total = data.reduce((s, d) => s + d.count, 0);
   return (
     <div className="bg-[#1a1d27] rounded-xl border border-white/[0.06] p-5">
-      <div className="mb-4">
-        <h3 className="text-sm font-semibold text-white">Leads por Dia</h3>
-        <p className="text-xs text-slate-500 mt-0.5">Últimos 30 dias</p>
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <h3 className="text-sm font-semibold text-white">Leads por Dia</h3>
+          <p className="text-xs text-slate-500 mt-0.5">{label ?? "Últimos 30 dias"}</p>
+        </div>
+        <div className="text-right">
+          <span className="text-xl font-bold text-white">{total}</span>
+          <p className="text-xs text-slate-600">total</p>
+        </div>
       </div>
       <ResponsiveContainer width="100%" height={200}>
         <AreaChart data={data} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
