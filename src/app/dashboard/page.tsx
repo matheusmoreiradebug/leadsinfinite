@@ -140,7 +140,7 @@ export default function DashboardPage() {
             <h3 className="text-sm font-semibold text-white mb-1">Ranking de Vendedores</h3>
             <p className="text-xs text-slate-600 mb-4">{range.label}</p>
             <div className="space-y-3">
-              {stats.leads_by_seller.sort((a, b) => b.count - a.count).map((s, i) => {
+              {[...stats.leads_by_seller].sort((a, b) => b.count - a.count).map((s, i) => {
                 const max = stats.leads_by_seller[0]?.count ?? 1;
                 return (
                   <div key={s.seller_id} className="flex items-center gap-4">
